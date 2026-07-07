@@ -1,0 +1,30 @@
+# Global Runtimes & Dependencies
+**/node_modules/
+**/.pnp
+.pnp.js
+
+
+# Environment Variables & Secrets (CRITICAL)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+**/.env
+**/.env.*
+
+
+# Build Outputs & Artifacts
+**/dist/
+**/build/
+.cache/
+.eslintcache
+
+
+# System Specific Files
+.DS_Store
+Thumbs.db
+
+# Local IDE and Agent extensions
+**/.qodo/
+**/.vscode/
