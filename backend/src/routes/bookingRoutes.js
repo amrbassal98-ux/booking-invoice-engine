@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   createBooking,
+  createCheckoutSession,
   getBooking,
   listBookings,
   updateBookingStatus
@@ -11,6 +12,7 @@ const router = Router();
 
 router.use(authenticateToken);
 
+router.post('/checkout', authorizeRoles('customer'), createCheckoutSession);
 router.post('/', authorizeRoles('customer'), createBooking);
 router.get('/', listBookings);
 router.get('/:id', getBooking);

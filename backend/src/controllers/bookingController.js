@@ -1,4 +1,7 @@
+import Stripe from 'stripe';
 import pool from '../config/db.js';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 export const createBooking = async (req, res) => {
   const { tenant_id, user_id } = req.user;
@@ -89,6 +92,74 @@ export const createBooking = async (req, res) => {
     await client.query('ROLLBACK');
     console.error("Booking transaction aborted:", error.message);
     return res.status(500).json({ error: "Internal booking service fault." });
+  } finally {
+    client.release();
+  }
+};
+
+export const createCheckoutSession = async (req, res) => {
+  const { tenant_id, user_id } = req.user;
+  const { availability_id, total_amount, currency } = req.body;
+
+  if (!availability_id || total_amount === undefined || total_amount === null) {
+    return res.status(400).json({ error: "Missing required fields: availability_id, total_amount." });
+  }
+
+  if (typeof total_amount !== 'number' || total_amount <= 0) {
+    return res.status(400).json({ error: "total_amount must be a positive number." });
+  }
+
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const slotQuery = `
+      SELECT id, tenant_id, staff_id, start_time, end_time, is_booked
+      FROM availabilities
+      WHERE id = $1 AND tenant_id = $2
+      FOR UPDATE;
+    `;
+    const slotResult = await client.query(slotQuery, [availability_id, tenant_id]);
+
+    if (slotResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: "Availability slot not found." });
+    }
+
+    const slot = slotResult.rows[0];
+
+    if (slot.is_booked) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: "Conflict: Availability slot is already booked." });
+    }
+
+    const amountInCents = Math.round(total_amount * 100);
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: amountInCents,
+      currency: (currency || 'usd').toLowerCase(),
+      automatic_payment_methods: { enabled: true },
+      metadata: {
+        tenant_id,
+        slot_id: availability_id,
+        customer_id: user_id,
+        total_amount: String(total_amount),
+        currency: currency || 'USD'
+      }
+    });
+
+    await client.query('COMMIT');
+
+    return res.status(201).json({
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id
+    });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error("Checkout session creation failed:", error.message);
+    return res.status(500).json({ error: "Internal checkout service fault." });
   } finally {
     client.release();
   }
