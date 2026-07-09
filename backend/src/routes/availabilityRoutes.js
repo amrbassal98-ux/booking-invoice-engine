@@ -12,10 +12,10 @@ const router = Router();
 
 router.use(authenticateToken);
 
-router.post('/', authorizeRoles('tenant_admin', 'staff'), createAvailability);
+router.post('/', authorizeRoles('tenant_admin', 'provider'), createAvailability);
 router.get('/', listAvailabilities);
 router.get('/:id', getAvailability);
-router.put('/:id', authorizeRoles('tenant_admin', 'staff'), updateAvailability);
-router.delete('/:id', authorizeRoles('tenant_admin'), deleteAvailability);
+router.put('/:id', authorizeRoles('tenant_admin', 'provider'), updateAvailability);
+router.delete('/:id', authorizeRoles('tenant_admin', 'provider'), deleteAvailability);
 
 export default router;
