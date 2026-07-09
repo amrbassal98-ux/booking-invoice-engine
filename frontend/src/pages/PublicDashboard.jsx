@@ -1,14 +1,20 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import api from '../api/axios.js';
+import { useAuth } from '../context/AuthContext.jsx';
 import { SlotCard } from '../components/SlotCard.jsx';
 import { Search, CalendarDays, Sparkles } from 'lucide-react';
 
 export const PublicDashboard = () => {
+  const { isAuthenticated } = useAuth();
   const [slots, setSlots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
+
+  if (isAuthenticated) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   const fetchSlots = async () => {
     setLoading(true);

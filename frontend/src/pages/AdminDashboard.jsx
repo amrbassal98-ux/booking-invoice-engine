@@ -3,7 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import api from '../api/axios.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { SlotCard } from '../components/SlotCard.jsx';
-import { LayoutDashboard, Plus, RefreshCw, Calendar, BookOpen } from 'lucide-react';
+import { InviteProviderForm } from '../components/InviteProviderForm.jsx';
+import { LayoutDashboard, Plus, RefreshCw, Calendar, BookOpen, Users } from 'lucide-react';
 
 export const AdminDashboard = () => {
   const { hasRole } = useAuth();
@@ -129,6 +130,19 @@ export const AdminDashboard = () => {
                 {bookings.length}
               </span>
             </button>
+            {hasRole('tenant_admin') && (
+              <button
+                onClick={() => setActiveTab('team')}
+                className={`inline-flex flex-row items-center gap-2 px-5 py-3.5 text-sm font-semibold rounded-t-xl transition-all duration-200 ${
+                  activeTab === 'team'
+                    ? 'text-indigo-600 bg-indigo-50/50 border-b-2 border-indigo-600'
+                    : 'text-slate-400 hover:text-slate-600 border-b-2 border-transparent'
+                }`}
+              >
+                <Users className="w-4 h-4" />
+                Team
+              </button>
+            )}
           </nav>
         </div>
 
@@ -158,6 +172,8 @@ export const AdminDashboard = () => {
                 ))}
               </div>
             )
+          ) : activeTab === 'team' ? (
+            <InviteProviderForm />
           ) : bookings.length === 0 ? (
             <div className="text-center py-16">
               <BookOpen className="w-10 h-10 text-slate-200 mx-auto mb-3" />
