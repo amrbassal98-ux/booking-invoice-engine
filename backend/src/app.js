@@ -6,10 +6,14 @@ import userRoutes from './routes/userRoutes.js';
 import availabilityRoutes from './routes/availabilityRoutes.js';
 import bookingRoutes from './routes/bookingRoutes.js';
 import invitationRoutes from './routes/invitationRoutes.js';
+import stripeWebhookRoutes from './routes/stripeWebhookRoutes.js';
 
 const app = express();
 
 app.use(cors());
+
+app.use('/api/webhooks', stripeWebhookRoutes);
+
 app.use(express.json());
 
 app.use('/api/auth', authRoutes);

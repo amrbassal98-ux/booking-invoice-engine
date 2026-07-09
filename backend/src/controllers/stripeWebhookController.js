@@ -1,0 +1,118 @@
+import Stripe from 'stripe';
+import pool from '../config/db.js';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
+
+export const handleStripeWebhook = async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+
+  if (!sig) {
+    return res.status(400).json({ error: "Missing stripe-signature header." });
+  }
+
+  let event;
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, WEBHOOK_SECRET);
+  } catch (err) {
+    console.error("Stripe webhook signature verification failed:", err.message);
+    return res.status(400).json({ error: `Webhook signature verification failed: ${err.message}` });
+  }
+
+  if (event.type !== 'payment_intent.succeeded' && event.type !== 'checkout.session.completed') {
+    return res.status(200).json({ received: true, message: `Unhandled event type: ${event.type}` });
+  }
+
+  const metadata = event.data.object.metadata;
+
+  const { tenant_id, slot_id, customer_id, total_amount, currency } = metadata;
+
+  if (!tenant_id || !slot_id || !customer_id || !total_amount) {
+    console.error("Stripe webhook missing required metadata:", metadata);
+    return res.status(400).json({ error: "Webhook event is missing required metadata keys." });
+  }
+
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const slotQuery = `
+      SELECT id, tenant_id, staff_id, start_time, end_time, is_booked
+      FROM availabilities
+      WHERE id = $1 AND tenant_id = $2
+      FOR UPDATE;
+    `;
+    const slotResult = await client.query(slotQuery, [slot_id, tenant_id]);
+
+    if (slotResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: "Availability slot not found." });
+    }
+
+    const slot = slotResult.rows[0];
+
+    if (slot.is_booked) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: "Conflict: Availability slot is already booked." });
+    }
+
+    const bookingQuery = `
+      INSERT INTO bookings (tenant_id, customer_id, availability_id, status, total_amount, currency)
+      VALUES ($1, $2, $3, 'confirmed', $4, $5)
+      RETURNING id, tenant_id, customer_id, availability_id, status, total_amount, currency, created_at;
+    `;
+    const bookingResult = await client.query(bookingQuery, [
+      tenant_id,
+      customer_id,
+      slot_id,
+      total_amount,
+      currency || 'USD'
+    ]);
+    const newBooking = bookingResult.rows[0];
+
+    const updateSlotQuery = `
+      UPDATE availabilities
+      SET is_booked = true
+      WHERE id = $1 AND tenant_id = $2;
+    `;
+    await client.query(updateSlotQuery, [slot_id, tenant_id]);
+
+    const invoiceQuery = `
+      INSERT INTO invoices (tenant_id, booking_id, amount_due)
+      VALUES ($1, $2, $3)
+      RETURNING id, tenant_id, booking_id, status, amount_due, amount_paid, created_at;
+    `;
+    const invoiceResult = await client.query(invoiceQuery, [
+      tenant_id,
+      newBooking.id,
+      total_amount
+    ]);
+    const newInvoice = invoiceResult.rows[0];
+
+    await client.query('COMMIT');
+
+    return res.status(200).json({
+      received: true,
+      booking: {
+        id: newBooking.id,
+        status: newBooking.status,
+        total_amount: newBooking.total_amount,
+        currency: newBooking.currency
+      },
+      invoice: {
+        id: newInvoice.id,
+        status: newInvoice.status,
+        amount_due: newInvoice.amount_due
+      }
+    });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error("Stripe webhook transaction aborted:", error.message);
+    return res.status(500).json({ error: "Internal webhook processing fault." });
+  } finally {
+    client.release();
+  }
+};
