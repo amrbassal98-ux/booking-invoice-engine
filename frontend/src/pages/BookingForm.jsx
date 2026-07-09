@@ -1,13 +1,20 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import api from '../api/axios.js';
-import { Calendar, Clock, DollarSign, CheckCircle, ArrowLeft } from 'lucide-react';
+import { StripeProvider } from '../components/StripeProvider.jsx';
+import { Calendar, Clock, DollarSign, CheckCircle, ArrowLeft, CreditCard, Loader2 } from 'lucide-react';
 
-export const BookingForm = () => {
+const BookingFormInner = ({ onClientSecretChange }) => {
   const { slotId } = useParams();
   const navigate = useNavigate();
+  const stripe = useStripe();
+  const elements = useElements();
+
   const [slot, setSlot] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [clientSecret, setClientSecret] = useState(null);
+  const [paymentReady, setPaymentReady] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
@@ -27,22 +34,58 @@ export const BookingForm = () => {
     fetchSlot();
   }, [slotId]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setSubmitting(true);
+  const handleInitPayment = async () => {
+    const amount = parseFloat(totalAmount);
+    if (!amount || amount <= 0) {
+      setError('Please enter a valid booking amount.');
+      return;
+    }
+
     setError(null);
+    setSubmitting(true);
+
     try {
-      await api.post('/api/bookings', {
+      const response = await api.post('/api/bookings/checkout', {
         availability_id: slotId,
-        total_amount: parseFloat(totalAmount),
+        total_amount: amount,
         currency: 'USD',
       });
-      setSuccess(true);
+      setClientSecret(response.data.clientSecret);
+      onClientSecretChange(response.data.clientSecret);
+      setPaymentReady(true);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to create booking.');
+      setError(err.response?.data?.error || 'Failed to initialize payment.');
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!stripe || !elements) {
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+
+    const { error: stripeError } = await stripe.confirmPayment({
+      elements,
+      confirmParams: {
+        return_url: `${window.location.origin}/book/${slotId}/success`,
+      },
+      redirect: 'if_required',
+    });
+
+    if (stripeError) {
+      setError(stripeError.message || 'Payment failed. Please try again.');
+      setSubmitting(false);
+      return;
+    }
+
+    setSuccess(true);
+    setSubmitting(false);
   };
 
   const formatDate = (d) => new Date(d).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
@@ -85,8 +128,8 @@ export const BookingForm = () => {
         <div className="w-20 h-20 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-6 border-4 border-emerald-100">
           <CheckCircle className="w-10 h-10 text-emerald-500" />
         </div>
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">Booking Confirmed!</h2>
-        <p className="text-slate-500 mb-8 text-sm">Your booking has been created successfully.</p>
+        <h2 className="text-2xl font-bold text-slate-900 mb-2">Payment Confirmed!</h2>
+        <p className="text-slate-500 mb-8 text-sm">Your payment was processed successfully. Your booking is being finalized.</p>
 
         <div className="bg-white border border-slate-200/80 rounded-2xl p-6 mb-8 text-left shadow-sm">
           <div className="flex flex-col gap-3">
@@ -167,30 +210,88 @@ export const BookingForm = () => {
             <DollarSign className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               id="amount" type="number" min="0.01" step="0.01" required
-              value={totalAmount} onChange={(e) => setTotalAmount(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all duration-200"
+              value={totalAmount}
+              onChange={(e) => setTotalAmount(e.target.value)}
+              disabled={paymentReady}
+              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               placeholder="0.00"
             />
           </div>
         </div>
 
-        <div className="flex flex-row gap-3 pt-2">
-          <button
-            type="button" onClick={() => navigate(-1)}
-            className="flex-1 inline-flex items-center justify-center bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300 py-3 px-4 rounded-xl text-sm font-semibold transition-all duration-200"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit" disabled={submitting}
-            className="flex-1 inline-flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 disabled:from-slate-300 disabled:to-slate-300 text-white py-3 px-4 rounded-xl text-sm font-semibold shadow-lg shadow-indigo-500/25 hover:shadow-xl transition-all duration-200"
-          >
-            {submitting ? (
-              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            ) : 'Confirm Booking'}
-          </button>
-        </div>
+        {!paymentReady && (
+          <div className="flex flex-row gap-3 pt-2">
+            <button
+              type="button" onClick={() => navigate(-1)}
+              className="flex-1 inline-flex items-center justify-center bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300 py-3 px-4 rounded-xl text-sm font-semibold transition-all duration-200"
+            >
+              Cancel
+            </button>
+            <button
+              type="button" onClick={handleInitPayment} disabled={submitting || !totalAmount}
+              className="flex-1 inline-flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 disabled:from-slate-300 disabled:to-slate-300 text-white py-3 px-4 rounded-xl text-sm font-semibold shadow-lg shadow-indigo-500/25 hover:shadow-xl transition-all duration-200"
+            >
+              {submitting ? (
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <>
+                  Continue to Payment
+                  <CreditCard className="w-4 h-4" />
+                </>
+              )}
+            </button>
+          </div>
+        )}
+
+        {paymentReady && (
+          <>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-semibold text-slate-700">
+                Payment Details
+              </label>
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                <PaymentElement
+                  options={{
+                    layout: 'tabs',
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-row gap-3 pt-2">
+              <button
+                type="button" onClick={() => { setPaymentReady(false); setClientSecret(null); setError(null); }}
+                className="flex-1 inline-flex items-center justify-center bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300 py-3 px-4 rounded-xl text-sm font-semibold transition-all duration-200"
+              >
+                Back
+              </button>
+              <button
+                type="submit" disabled={submitting || !stripe || !elements}
+                className="flex-1 inline-flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 disabled:from-slate-300 disabled:to-slate-300 text-white py-3 px-4 rounded-xl text-sm font-semibold shadow-lg shadow-indigo-500/25 hover:shadow-xl transition-all duration-200"
+              >
+                {submitting ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <>
+                    Pay ${totalAmount}
+                    <CreditCard className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </div>
+          </>
+        )}
       </form>
     </div>
+  );
+};
+
+export const BookingForm = () => {
+  const [clientSecret, setClientSecret] = useState(null);
+
+  return (
+    <StripeProvider clientSecret={clientSecret}>
+      <BookingFormInner onClientSecretChange={setClientSecret} />
+    </StripeProvider>
   );
 };
