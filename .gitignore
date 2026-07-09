@@ -28,3 +28,5 @@ Thumbs.db
 # Local IDE and Agent extensions
 **/.qodo/
 **/.vscode/
+.agents/
+skills-lock.json
