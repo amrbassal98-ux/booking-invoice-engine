@@ -5,6 +5,7 @@ import tenantRoutes from './routes/tenantRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import availabilityRoutes from './routes/availabilityRoutes.js';
 import bookingRoutes from './routes/bookingRoutes.js';
+import invitationRoutes from './routes/invitationRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -17,6 +18,7 @@ app.use('/api/tenants', tenantRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/availabilities', availabilityRoutes);
 app.use('/api/bookings', bookingRoutes);
+app.use('/api/invitations', invitationRoutes);
 
 app.get('/health', (req, res) => {
   res.status(200).json({ status: "UP", timestamp: new Date() });
