@@ -8,6 +8,7 @@ import { PublicDashboard } from './pages/PublicDashboard.jsx';
 import { AdminDashboard } from './pages/AdminDashboard.jsx';
 import { BookingForm } from './pages/BookingForm.jsx';
 import { SlotForm } from './pages/SlotForm.jsx';
+import { Unauthorized } from './pages/Unauthorized.jsx';
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
             <Route path="/" element={<PublicDashboard />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/unauthorized" element={<Unauthorized />} />
             <Route
               path="/dashboard"
               element={
