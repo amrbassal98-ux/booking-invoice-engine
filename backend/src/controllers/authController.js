@@ -18,30 +18,44 @@ export const loginUser = async (req, res) => {
   try {
     client = await pool.connect();
 
-    const userQuery = `
-      SELECT id, tenant_id, email, password_hash, role, first_name, last_name
-      FROM users
-      WHERE email = $1;
-    `;
-    const result = await client.query(userQuery, [email]);
+    const userResult = await client.query(
+      'SELECT id, email, password_hash, first_name, last_name FROM users WHERE email = $1',
+      [email]
+    );
 
-    if (result.rows.length === 0) {
+    if (userResult.rows.length === 0) {
       return res.status(401).json({ error: "Invalid email or password." });
     }
 
-    const user = result.rows[0];
+    const user = userResult.rows[0];
 
     const passwordValid = await bcrypt.compare(password, user.password_hash);
     if (!passwordValid) {
       return res.status(401).json({ error: "Invalid email or password." });
     }
 
+    const tenantResult = await client.query(
+      `SELECT tu.tenant_id, t.slug, t.name, tu.role
+       FROM tenant_users tu
+       JOIN tenants t ON tu.tenant_id = t.id
+       WHERE tu.user_id = $1
+       ORDER BY t.name ASC`,
+      [user.id]
+    );
+
+    const workspaces = tenantResult.rows;
+
+    if (workspaces.length === 0) {
+      return res.status(403).json({ error: "Access denied. No tenant workspace assigned." });
+    }
+
+    const primary = workspaces[0];
+
     const tokenPayload = {
       user_id: user.id,
-      tenant_id: user.tenant_id,
-      role: user.role
+      tenant_id: primary.tenant_id,
+      role: primary.role
     };
-
     const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, { expiresIn: '24h' });
 
     return res.status(200).json({
@@ -49,12 +63,12 @@ export const loginUser = async (req, res) => {
       token,
       user: {
         id: user.id,
-        tenant_id: user.tenant_id,
         email: user.email,
-        role: user.role,
         first_name: user.first_name,
-        last_name: user.last_name
-      }
+        last_name: user.last_name,
+        role: primary.role
+      },
+      workspaces
     });
 
   } catch (error) {

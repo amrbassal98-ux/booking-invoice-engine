@@ -19,36 +19,31 @@ export const registerTenantAdmin = async (req, res) => {
   try {
     await client.query('BEGIN');
 
-    const tenantQuery = `
-      INSERT INTO tenants (name, slug)
-      VALUES ($1, $2)
-      RETURNING id, name, slug, created_at;
-    `;
-    const tenantResult = await client.query(tenantQuery, [tenantName, tenantSlug]);
+    const tenantResult = await client.query(
+      'INSERT INTO tenants (name, slug) VALUES ($1, $2) RETURNING id, name, slug, created_at',
+      [tenantName, tenantSlug]
+    );
     const newTenant = tenantResult.rows[0];
 
     const passwordHash = await bcrypt.hash(password, 12);
 
-    const userQuery = `
-      INSERT INTO users (tenant_id, email, password_hash, role, first_name, last_name)
-      VALUES ($1, $2, $3, 'tenant_admin', $4, $5)
-      RETURNING id, tenant_id, email, role, first_name, last_name, created_at;
-    `;
-    const userResult = await client.query(userQuery, [
-      newTenant.id,
-      email,
-      passwordHash,
-      firstName || null,
-      lastName || null
-    ]);
-    const newAdmin = userResult.rows[0];
+    const userResult = await client.query(
+      'INSERT INTO users (email, password_hash, first_name, last_name) VALUES ($1, $2, $3, $4) RETURNING id, email, first_name, last_name, created_at',
+      [email, passwordHash, firstName || null, lastName || null]
+    );
+    const newUser = userResult.rows[0];
+
+    await client.query(
+      'INSERT INTO tenant_users (tenant_id, user_id, role) VALUES ($1, $2, $3)',
+      [newTenant.id, newUser.id, 'tenant_admin']
+    );
 
     await client.query('COMMIT');
 
     const tokenPayload = {
-      user_id: newAdmin.id,
+      user_id: newUser.id,
       tenant_id: newTenant.id,
-      role: newAdmin.role
+      role: 'tenant_admin'
     };
     const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, { expiresIn: '24h' });
 
@@ -56,7 +51,12 @@ export const registerTenantAdmin = async (req, res) => {
       message: "Tenant registration completed successfully.",
       token,
       tenant: newTenant,
-      user: newAdmin
+      user: {
+        id: newUser.id,
+        email: newUser.email,
+        first_name: newUser.first_name,
+        last_name: newUser.last_name
+      }
     });
 
   } catch (error) {
