@@ -1,19 +1,79 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import { LogIn, Mail, Lock, ArrowRight } from 'lucide-react';
+import { LogIn, Mail, Lock, ArrowRight, Building2, ChevronRight } from 'lucide-react';
 
 export const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { login, loading, error } = useAuth();
+  const [pendingWorkspaces, setPendingWorkspaces] = useState(null);
+  const { login, switchTenant, loading, error } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     const result = await login(email, password);
-    if (result.success) navigate('/dashboard');
+    if (!result.success) return;
+
+    if (result.workspaces.length === 1) {
+      navigate('/dashboard');
+    } else {
+      setPendingWorkspaces(result.workspaces);
+    }
   };
+
+  const handleSelectWorkspace = (tenantId) => {
+    switchTenant(tenantId);
+    navigate('/dashboard');
+  };
+
+  if (pendingWorkspaces) {
+    return (
+      <div className="min-h-[85vh] flex items-center justify-center px-4">
+        <div className="w-full max-w-md">
+          <div className="text-center mb-10">
+            <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-lg shadow-indigo-500/30">
+              <Building2 className="w-7 h-7 text-white" />
+            </div>
+            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Select workspace</h1>
+            <p className="text-slate-500 mt-2 text-sm">Choose an organization to continue</p>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xl shadow-slate-200/40 divide-y divide-slate-100">
+            {pendingWorkspaces.map((ws) => (
+              <button
+                key={ws.tenant_id}
+                onClick={() => handleSelectWorkspace(ws.tenant_id)}
+                className="w-full flex flex-row items-center justify-between p-5 hover:bg-slate-50 transition-colors duration-150 group"
+              >
+                <div className="flex flex-row items-center gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white text-sm font-semibold shadow-sm">
+                    {ws.name?.[0]?.toUpperCase() || 'W'}
+                  </div>
+                  <div className="flex flex-col items-start">
+                    <span className="text-sm font-semibold text-slate-900">{ws.name}</span>
+                    <span className="text-xs text-slate-400 font-medium uppercase tracking-wider">
+                      {ws.role?.replace('_', ' ')}
+                    </span>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-indigo-500 transition-colors" />
+              </button>
+            ))}
+          </div>
+
+          <p className="text-center text-sm text-slate-500 mt-6">
+            <button
+              onClick={() => { setPendingWorkspaces(null); }}
+              className="text-indigo-600 hover:text-indigo-700 font-semibold"
+            >
+              Sign in as different user
+            </button>
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-[85vh] flex items-center justify-center px-4">
