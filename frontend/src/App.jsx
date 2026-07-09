@@ -41,7 +41,7 @@ export default function App() {
             <Route
               path="/admin/slots/new"
               element={
-                <ProtectedRoute roles={['tenant_admin', 'staff']}>
+                <ProtectedRoute roles={['tenant_admin', 'staff', 'provider']}>
                   <SlotForm />
                 </ProtectedRoute>
               }
@@ -49,7 +49,7 @@ export default function App() {
             <Route
               path="/admin/slots/:id/edit"
               element={
-                <ProtectedRoute roles={['tenant_admin', 'staff']}>
+                <ProtectedRoute roles={['tenant_admin', 'staff', 'provider']}>
                   <SlotForm />
                 </ProtectedRoute>
               }

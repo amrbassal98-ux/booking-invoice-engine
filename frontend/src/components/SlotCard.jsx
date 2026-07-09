@@ -3,8 +3,9 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useNavigate } from 'react-router-dom';
 
 export const SlotCard = ({ slot, onBook, showActions = false, onEdit, onDelete }) => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, activeTenant } = useAuth();
   const navigate = useNavigate();
+  const isProvider = activeTenant?.role === 'provider';
 
   const formatDate = (dateStr) =>
     new Date(dateStr).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
@@ -66,7 +67,7 @@ export const SlotCard = ({ slot, onBook, showActions = false, onEdit, onDelete }
           </button>
         )}
 
-        {showActions && (
+        {showActions && !(isProvider && slot.is_booked) && (
           <>
             {onEdit && (
               <button

@@ -68,6 +68,17 @@ export const BookingForm = () => {
     );
   }
 
+  if (slot && slot.is_booked) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20">
+        <p className="text-slate-500 mb-4 font-medium">This slot is no longer available.</p>
+        <button onClick={() => navigate('/')} className="text-indigo-600 hover:text-indigo-700 font-semibold text-sm">
+          Browse other slots
+        </button>
+      </div>
+    );
+  }
+
   if (success) {
     return (
       <div className="w-full max-w-md mx-auto text-center py-16">

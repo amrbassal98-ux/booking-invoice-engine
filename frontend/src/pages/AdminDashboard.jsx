@@ -220,7 +220,7 @@ export const AdminDashboard = () => {
                         </span>
                       </td>
                       <td className="py-3.5 pr-4 text-right">
-                        {hasRole('tenant_admin', 'staff') && (
+                        {hasRole('tenant_admin', 'provider') && (
                           <div className="inline-flex flex-row items-center justify-end gap-1">
                             {booking.status === 'pending' && (
                               <>
