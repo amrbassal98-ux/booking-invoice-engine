@@ -91,7 +91,9 @@ export const listAvailabilities = async (req, res) => {
       paramIndex++;
     }
 
-    if (is_booked !== undefined) {
+    if (role === 'customer') {
+      query += ` AND is_booked = false`;
+    } else if (is_booked !== undefined) {
       query += ` AND is_booked = $${paramIndex}`;
       params.push(is_booked === 'true');
       paramIndex++;
