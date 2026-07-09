@@ -50,13 +50,19 @@ export const registerTenantAdmin = async (req, res) => {
     return res.status(201).json({
       message: "Tenant registration completed successfully.",
       token,
-      tenant: newTenant,
       user: {
         id: newUser.id,
         email: newUser.email,
         first_name: newUser.first_name,
-        last_name: newUser.last_name
-      }
+        last_name: newUser.last_name,
+        role: 'tenant_admin'
+      },
+      workspaces: [{
+        tenant_id: newTenant.id,
+        slug: newTenant.slug,
+        name: newTenant.name,
+        role: 'tenant_admin'
+      }]
     });
 
   } catch (error) {
