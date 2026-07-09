@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useCallback } from 'react';
 import api from '../api/axios.js';
 
 const AuthContext = createContext(null);
@@ -17,25 +17,65 @@ export const AuthProvider = ({ children }) => {
     return stored ? JSON.parse(stored) : null;
   });
 
+  const [memberships, setMemberships] = useState(() => {
+    const stored = localStorage.getItem('memberships');
+    return stored ? JSON.parse(stored) : [];
+  });
+
+  const [activeTenant, setActiveTenant] = useState(() => {
+    const stored = localStorage.getItem('activeTenant');
+    return stored ? JSON.parse(stored) : null;
+  });
+
   const [token, setToken] = useState(() => localStorage.getItem('token'));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const isAuthenticated = !!token && !!user;
 
+  const switchTenant = useCallback((tenantId) => {
+    const membership = memberships.find((m) => m.tenant_id === tenantId);
+    if (membership) {
+      setActiveTenant(membership);
+      localStorage.setItem('activeTenant', JSON.stringify(membership));
+    }
+  }, [memberships]);
+
+  const persistAuth = useCallback((newToken, userData, workspaces) => {
+    localStorage.setItem('token', newToken);
+    localStorage.setItem('user', JSON.stringify(userData));
+    localStorage.setItem('memberships', JSON.stringify(workspaces));
+
+    const primary = workspaces[0];
+    localStorage.setItem('activeTenant', JSON.stringify(primary));
+
+    setToken(newToken);
+    setUser(userData);
+    setMemberships(workspaces);
+    setActiveTenant(primary);
+  }, []);
+
+  const clearAuth = useCallback(() => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('memberships');
+    localStorage.removeItem('activeTenant');
+    setToken(null);
+    setUser(null);
+    setMemberships([]);
+    setActiveTenant(null);
+  }, []);
+
   const login = useCallback(async (email, password) => {
     setLoading(true);
     setError(null);
     try {
       const response = await api.post('/api/auth/login', { email, password });
-      const { token: newToken, user: userData } = response.data;
+      const { token: newToken, user: userData, workspaces } = response.data;
 
-      localStorage.setItem('token', newToken);
-      localStorage.setItem('user', JSON.stringify(userData));
-      setToken(newToken);
-      setUser(userData);
+      persistAuth(newToken, userData, workspaces);
 
-      return { success: true };
+      return { success: true, workspaces };
     } catch (err) {
       const message = err.response?.data?.error || 'Login failed.';
       setError(message);
@@ -43,21 +83,18 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [persistAuth]);
 
   const register = useCallback(async (data) => {
     setLoading(true);
     setError(null);
     try {
       const response = await api.post('/api/tenants/onboard', data);
-      const { token: newToken, user: userData } = response.data;
+      const { token: newToken, user: userData, workspaces } = response.data;
 
-      localStorage.setItem('token', newToken);
-      localStorage.setItem('user', JSON.stringify(userData));
-      setToken(newToken);
-      setUser(userData);
+      persistAuth(newToken, userData, workspaces);
 
-      return { success: true };
+      return { success: true, workspaces };
     } catch (err) {
       const message = err.response?.data?.error || 'Registration failed.';
       setError(message);
@@ -65,22 +102,21 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [persistAuth]);
 
   const logout = useCallback(() => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    setToken(null);
-    setUser(null);
-  }, []);
+    clearAuth();
+  }, [clearAuth]);
 
   const hasRole = useCallback((...roles) => {
-    return user ? roles.includes(user.role) : false;
-  }, [user]);
+    return activeTenant ? roles.includes(activeTenant.role) : false;
+  }, [activeTenant]);
 
   const value = {
     user,
     token,
+    memberships,
+    activeTenant,
     loading,
     error,
     isAuthenticated,
@@ -88,6 +124,7 @@ export const AuthProvider = ({ children }) => {
     register,
     logout,
     hasRole,
+    switchTenant,
   };
 
   return (
