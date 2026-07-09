@@ -18,11 +18,18 @@ export const authenticateToken = async (req, res, next) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
+    const requestedTenantId = req.headers['x-tenant-id']
+      || decoded.tenant_id;
+
+    if (!requestedTenantId || Number.isNaN(requestedTenantId)) {
+      return res.status(400).json({ error: "Access denied. Invalid tenant context." });
+    }
+
     client = await pool.connect();
 
     const result = await client.query(
       'SELECT role FROM tenant_users WHERE tenant_id = $1 AND user_id = $2',
-      [decoded.tenant_id, decoded.user_id]
+      [requestedTenantId, decoded.user_id]
     );
 
     if (result.rows.length === 0) {
@@ -33,10 +40,10 @@ export const authenticateToken = async (req, res, next) => {
 
     req.user = {
       user_id: decoded.user_id,
-      tenant_id: decoded.tenant_id,
+      tenant_id: requestedTenantId,
       role: confirmedRole
     };
-    req.tenant_id = decoded.tenant_id;
+    req.tenant_id = requestedTenantId;
     req.user_role = confirmedRole;
 
     next();
@@ -47,8 +54,8 @@ export const authenticateToken = async (req, res, next) => {
     if (error.name === 'JsonWebTokenError') {
       return res.status(403).json({ error: "Access denied. Invalid token." });
     }
-    console.error("Token verification failed:", error.message);
-    return res.status(403).json({ error: "Access denied. Token verification failed." });
+    console.error('[AUTH] Middleware error:', error.code || error.name, error.message);
+    return res.status(500).json({ error: "Internal authentication service error." });
   } finally {
     if (client) {
       client.release();
