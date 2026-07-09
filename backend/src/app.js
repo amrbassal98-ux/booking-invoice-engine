@@ -1,5 +1,9 @@
 import express from 'express';
 import cors from 'cors';
+import authRoutes from './routes/authRoutes.js';
+import tenantRoutes from './routes/tenantRoutes.js';
+import availabilityRoutes from './routes/availabilityRoutes.js';
+import bookingRoutes from './routes/bookingRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -7,10 +11,15 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
+app.use('/api/auth', authRoutes);
+app.use('/api/tenants', tenantRoutes);
+app.use('/api/availabilities', availabilityRoutes);
+app.use('/api/bookings', bookingRoutes);
+
 app.get('/health', (req, res) => {
   res.status(200).json({ status: "UP", timestamp: new Date() });
 });
 
 app.listen(PORT, () => {
-  console.log(`System Runtime initialized on port ${PORT} inside WSL2 backend module`);
+  console.log(`[SERVER] Initialized on port ${PORT}`);
 });
