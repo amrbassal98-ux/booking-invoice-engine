@@ -104,6 +104,27 @@ export const AuthProvider = ({ children }) => {
     }
   }, [persistAuth]);
 
+  const acceptInvite = useCallback(async (inviteData) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await api.post('/api/invitations/accept', inviteData);
+      const { token: newToken, user: userData, workspaces } = response.data;
+
+      if (newToken && workspaces) {
+        persistAuth(newToken, userData, workspaces);
+      }
+
+      return { success: true, data: response.data };
+    } catch (err) {
+      const message = err.response?.data?.error || 'Failed to accept invitation.';
+      setError(message);
+      return { success: false, error: message };
+    } finally {
+      setLoading(false);
+    }
+  }, [persistAuth]);
+
   const logout = useCallback(() => {
     clearAuth();
   }, [clearAuth]);
@@ -122,6 +143,7 @@ export const AuthProvider = ({ children }) => {
     isAuthenticated,
     login,
     register,
+    acceptInvite,
     logout,
     hasRole,
     switchTenant,
