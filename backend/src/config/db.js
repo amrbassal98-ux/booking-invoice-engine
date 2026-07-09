@@ -13,8 +13,12 @@ const pool = new Pool({
   connectionTimeoutMillis: 2000,
 });
 
+pool.on('connect', () => {
+  console.log('[DB] New client connected to PostgreSQL pool');
+});
+
 pool.on('error', (err) => {
-  console.error('Unexpected database pool client validation error:', err.message);
+  console.error('[DB] Unexpected idle client error:', err.message);
 });
 
 export default pool;
