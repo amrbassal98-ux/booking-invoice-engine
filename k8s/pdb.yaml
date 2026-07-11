@@ -1,0 +1,25 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: frontend-pdb
+  labels:
+    app: booking-engine
+    component: frontend
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      component: frontend
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: backend-pdb
+  labels:
+    app: booking-engine
+    component: backend
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      component: backend
