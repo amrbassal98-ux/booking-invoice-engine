@@ -1,5 +1,26 @@
+/**
+ * @fileoverview User directory controller.
+ *
+ * Provides read-only queries for tenant member listings, used by
+ * admin dashboards to populate staff/provider dropdowns.
+ *
+ * @module controllers/userController
+ */
+
 import pool from '../config/db.js';
 
+/**
+ * GET /api/users/providers
+ *
+ * Lists all users with `provider` or `staff` roles in the current tenant.
+ * Restricted to `tenant_admin` role.
+ *
+ * @param   {import('express').Request}  req
+ * @param   {import('express').Response} res
+ * @returns {Promise<void>}
+ *
+ * @response {object} 200 - { count, providers: Array<{ id, email, first_name, last_name, role }> }
+ */
 export const listProviders = async (req, res) => {
   const { tenant_id } = req.user;
 

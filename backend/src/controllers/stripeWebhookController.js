@@ -1,22 +1,62 @@
+/**
+ * @fileoverview Stripe webhook handler.
+ *
+ * Processes incoming Stripe webhook events for payment confirmation.
+ * Supports both `payment_intent.succeeded` and `checkout.session.completed`
+ * event types.
+ *
+ * When a payment succeeds, the handler atomically:
+ *   1. Locks and validates the target availability slot
+ *   2. Creates a confirmed booking record
+ *   3. Marks the slot as booked
+ *   4. Creates a corresponding invoice
+ *
+ * Signature verification is enforced unless SKIP_WEBHOOK_SIGNATURE=true
+ * (for local development only).
+ *
+ * @module controllers/stripeWebhookController
+ */
+
 import Stripe from 'stripe';
 import pool from '../config/db.js';
 
+/** Lazy-initialized Stripe SDK client (singleton). */
 let _stripe;
 const getStripe = () => {
   if (!_stripe) _stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
   return _stripe;
 };
 
+/** Webhook signing secret — required for production signature verification. */
 const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
+
+/** When true, skips signature verification (development/testing only). */
 const SKIP_SIGNATURE = process.env.SKIP_WEBHOOK_SIGNATURE === 'true';
 
+/**
+ * POST /api/webhooks/stripe
+ *
+ * Receives and processes Stripe webhook events. The raw request body is
+ * preserved for signature verification via `express.raw()` middleware.
+ *
+ * @param   {import('express').Request}  req
+ * @param   {import('express').Response} res
+ * @returns {Promise<void>}
+ *
+ * @response {object} 200 - Event received (processed or acknowledged)
+ * @response {object} 400 - Missing signature or verification failure
+ * @response {object} 404 - Slot not found in metadata
+ * @response {object} 409 - Slot already booked
+ */
 export const handleStripeWebhook = async (req, res) => {
   let event;
 
   if (SKIP_SIGNATURE) {
+    /** Development mode — parse body directly without verification. */
     const raw = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : req.body;
     event = typeof raw === 'string' ? JSON.parse(raw) : raw;
   } else {
+    /** Production mode — verify Stripe webhook signature. */
     const sig = req.headers['stripe-signature'];
 
     if (!sig) {
@@ -31,10 +71,12 @@ export const handleStripeWebhook = async (req, res) => {
     }
   }
 
+  /** Acknowledge unhandled event types without processing. */
   if (event.type !== 'payment_intent.succeeded' && event.type !== 'checkout.session.completed') {
     return res.status(200).json({ received: true, message: `Unhandled event type: ${event.type}` });
   }
 
+  /** Extract booking metadata from the Stripe event. */
   const metadata = event.data.object.metadata;
 
   const { tenant_id, slot_id, customer_id, total_amount, currency } = metadata;
@@ -49,6 +91,7 @@ export const handleStripeWebhook = async (req, res) => {
   try {
     await client.query('BEGIN');
 
+    /** Lock the slot row to prevent concurrent bookings. */
     const slotQuery = `
       SELECT id, tenant_id, staff_id, start_time, end_time, is_booked
       FROM availabilities
@@ -69,6 +112,7 @@ export const handleStripeWebhook = async (req, res) => {
       return res.status(409).json({ error: "Conflict: Availability slot is already booked." });
     }
 
+    /** Create confirmed booking — status set to 'confirmed' directly (payment already succeeded). */
     const bookingQuery = `
       INSERT INTO bookings (tenant_id, customer_id, availability_id, status, total_amount, currency)
       VALUES ($1, $2, $3, 'confirmed', $4, $5)
@@ -83,6 +127,7 @@ export const handleStripeWebhook = async (req, res) => {
     ]);
     const newBooking = bookingResult.rows[0];
 
+    /** Mark the availability slot as booked. */
     const updateSlotQuery = `
       UPDATE availabilities
       SET is_booked = true
@@ -90,6 +135,7 @@ export const handleStripeWebhook = async (req, res) => {
     `;
     await client.query(updateSlotQuery, [slot_id, tenant_id]);
 
+    /** Create a corresponding invoice record. */
     const invoiceQuery = `
       INSERT INTO invoices (tenant_id, booking_id, amount_due)
       VALUES ($1, $2, $3)
