@@ -19,6 +19,11 @@ spec:
         app: booking-engine
         component: database
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
       containers:
         - name: postgres
           image: postgres:16-alpine
@@ -33,8 +38,8 @@ spec:
                   key: DATABASE_NAME
             - name: POSTGRES_USER
               valueFrom:
-                configMapKeyRef:
-                  name: app-config
+                secretKeyRef:
+                  name: app-secrets
                   key: DATABASE_USER
             - name: POSTGRES_PASSWORD
               valueFrom:
@@ -53,6 +58,12 @@ spec:
             limits:
               cpu: 500m
               memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
           readinessProbe:
             exec:
               command:
