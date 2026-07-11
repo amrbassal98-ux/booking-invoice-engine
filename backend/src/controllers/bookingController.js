@@ -1,12 +1,47 @@
+/**
+ * @fileoverview Booking lifecycle controller.
+ *
+ * Manages the full booking lifecycle:
+ *   1. `createBooking`      — Direct in-app booking (creates booking + invoice atomically).
+ *   2. `createCheckoutSession` — Stripe PaymentIntent creation for hosted checkout.
+ *   3. `getBooking`         — Single booking retrieval with slot and invoice joins.
+ *   4. `listBookings`       — Filtered booking list for the current tenant.
+ *   5. `updateBookingStatus` — Status transitions (pending → confirmed → completed/cancelled).
+ *
+ * All mutating operations run inside PostgreSQL transactions with `FOR UPDATE`
+ * row locking to prevent race conditions on slot availability.
+ *
+ * @module controllers/bookingController
+ */
+
 import Stripe from 'stripe';
 import pool from '../config/db.js';
 
+/** Lazy-initialized Stripe SDK client (singleton). */
 let _stripe;
 const getStripe = () => {
   if (!_stripe) _stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
   return _stripe;
 };
 
+/**
+ * POST /api/bookings
+ *
+ * Creates a direct booking for an available slot. Runs atomically:
+ *   1. Lock and verify slot availability
+ *   2. Insert booking record
+ *   3. Mark slot as booked
+ *   4. Create corresponding invoice
+ *
+ * @param   {import('express').Request}  req
+ * @param   {import('express').Response} res
+ * @returns {Promise<void>}
+ *
+ * @response {object} 201 - Booking + invoice created
+ * @response {object} 400 - Missing fields or invalid amount
+ * @response {object} 404 - Slot not found
+ * @response {object} 409 - Slot already booked
+ */
 export const createBooking = async (req, res) => {
   const { tenant_id, user_id } = req.user;
   const { availability_id, total_amount, currency } = req.body;
@@ -24,6 +59,7 @@ export const createBooking = async (req, res) => {
   try {
     await client.query('BEGIN');
 
+    /** Lock the slot row to prevent concurrent bookings. */
     const slotQuery = `
       SELECT id, tenant_id, staff_id, start_time, end_time, is_booked
       FROM availabilities
@@ -44,6 +80,7 @@ export const createBooking = async (req, res) => {
       return res.status(409).json({ error: "Conflict: Availability slot is already booked." });
     }
 
+    /** Insert booking record with 'pending' status. */
     const bookingQuery = `
       INSERT INTO bookings (tenant_id, customer_id, availability_id, total_amount, currency)
       VALUES ($1, $2, $3, $4, $5)
@@ -58,6 +95,7 @@ export const createBooking = async (req, res) => {
     ]);
     const newBooking = bookingResult.rows[0];
 
+    /** Mark the availability slot as booked. */
     const updateSlotQuery = `
       UPDATE availabilities
       SET is_booked = true
@@ -65,6 +103,7 @@ export const createBooking = async (req, res) => {
     `;
     await client.query(updateSlotQuery, [availability_id, tenant_id]);
 
+    /** Create a corresponding invoice record. */
     const invoiceQuery = `
       INSERT INTO invoices (tenant_id, booking_id, amount_due)
       VALUES ($1, $2, $3)
@@ -101,6 +140,22 @@ export const createBooking = async (req, res) => {
   }
 };
 
+/**
+ * POST /api/bookings/checkout
+ *
+ * Creates a Stripe PaymentIntent for a booking. Validates slot availability,
+ * converts the amount to cents, and returns the client secret for frontend
+ * Stripe Elements integration.
+ *
+ * @param   {import('express').Request}  req
+ * @param   {import('express').Response} res
+ * @returns {Promise<void>}
+ *
+ * @response {object} 201 - { clientSecret, paymentIntentId }
+ * @response {object} 400 - Missing fields or invalid amount
+ * @response {object} 404 - Slot not found
+ * @response {object} 409 - Slot already booked
+ */
 export const createCheckoutSession = async (req, res) => {
   const { tenant_id, user_id } = req.user;
   const { availability_id, total_amount, currency } = req.body;
@@ -138,8 +193,10 @@ export const createCheckoutSession = async (req, res) => {
       return res.status(409).json({ error: "Conflict: Availability slot is already booked." });
     }
 
+    /** Convert dollar amount to cents for Stripe. */
     const amountInCents = Math.round(total_amount * 100);
 
+    /** Create Stripe PaymentIntent with booking metadata for webhook reconciliation. */
     const paymentIntent = await getStripe().paymentIntents.create({
       amount: amountInCents,
       currency: (currency || 'usd').toLowerCase(),
@@ -169,6 +226,18 @@ export const createCheckoutSession = async (req, res) => {
   }
 };
 
+/**
+ * GET /api/bookings/:id
+ *
+ * Retrieves a single booking with joined slot and invoice data.
+ *
+ * @param   {import('express').Request}  req
+ * @param   {import('express').Response} res
+ * @returns {Promise<void>}
+ *
+ * @response {object} 200 - Booking with slot and invoice details
+ * @response {object} 404 - Booking not found
+ */
 export const getBooking = async (req, res) => {
   const { id } = req.params;
   const { tenant_id } = req.user;
@@ -230,6 +299,19 @@ export const getBooking = async (req, res) => {
   }
 };
 
+/**
+ * GET /api/bookings
+ *
+ * Lists all bookings for the current tenant with optional filters.
+ *
+ * @param   {import('express').Request}  req
+ * @param   {import('express').Response} res
+ * @returns {Promise<void>}
+ *
+ * @query   {string} [status] - Filter by booking status
+ * @query   {string} [from]   - Created-at lower bound (ISO 8601)
+ * @query   {string} [to]     - Created-at upper bound (ISO 8601)
+ */
 export const listBookings = async (req, res) => {
   const { tenant_id } = req.user;
   const { status, from, to } = req.query;
@@ -285,6 +367,25 @@ export const listBookings = async (req, res) => {
   }
 };
 
+/**
+ * PATCH /api/bookings/:id/status
+ *
+ * Updates a booking's status. Enforces valid state transitions:
+ *   - `pending` → `confirmed`, `cancelled`
+ *   - `confirmed` → `completed`, `cancelled`
+ *   - `cancelled` / `completed` → terminal (no further updates)
+ *
+ * On cancellation, the availability slot is released and the invoice is voided.
+ *
+ * @param   {import('express').Request}  req
+ * @param   {import('express').Response} res
+ * @returns {Promise<void>}
+ *
+ * @response {object} 200 - Status updated
+ * @response {object} 400 - Invalid status value
+ * @response {object} 404 - Booking not found
+ * @response {object} 409 - Booking already in terminal state
+ */
 export const updateBookingStatus = async (req, res) => {
   const { id } = req.params;
   const { tenant_id } = req.user;
@@ -328,6 +429,7 @@ export const updateBookingStatus = async (req, res) => {
     `;
     const result = await client.query(updateQuery, [status, id, tenant_id]);
 
+    /** Side effects on cancellation — release slot and void invoice. */
     if (status === 'cancelled') {
       const releaseSlotQuery = `
         UPDATE availabilities
