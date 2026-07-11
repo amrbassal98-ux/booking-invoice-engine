@@ -1,7 +1,11 @@
 import Stripe from 'stripe';
 import pool from '../config/db.js';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+let _stripe;
+const getStripe = () => {
+  if (!_stripe) _stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+  return _stripe;
+};
 
 export const createBooking = async (req, res) => {
   const { tenant_id, user_id } = req.user;
@@ -136,7 +140,7 @@ export const createCheckoutSession = async (req, res) => {
 
     const amountInCents = Math.round(total_amount * 100);
 
-    const paymentIntent = await stripe.paymentIntents.create({
+    const paymentIntent = await getStripe().paymentIntents.create({
       amount: amountInCents,
       currency: (currency || 'usd').toLowerCase(),
       automatic_payment_methods: { enabled: true },
