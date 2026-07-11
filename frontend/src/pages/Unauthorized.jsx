@@ -1,3 +1,12 @@
+/**
+ * @fileoverview Unauthorized access page.
+ *
+ * Displayed when an authenticated user attempts to access a route
+ * their role does not permit. Provides a link back to the dashboard.
+ *
+ * @module pages/Unauthorized
+ */
+
 import { Link } from 'react-router-dom';
 import { ShieldX, ArrowLeft } from 'lucide-react';
 

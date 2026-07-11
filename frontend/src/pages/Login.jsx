@@ -1,3 +1,15 @@
+/**
+ * @fileoverview Login page component.
+ *
+ * Two-phase login flow:
+ *   1. Email/password form submission
+ *   2. If user has multiple workspaces, displays a workspace selector
+ *
+ * Clears auth errors on mount and handles loading/error states.
+ *
+ * @module pages/Login
+ */
+
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -12,6 +24,7 @@ export const Login = () => {
 
   useEffect(() => { clearError(); }, [clearError]);
 
+  /** Submits credentials and transitions to workspace selection if multi-tenant. */
   const handleSubmit = async (e) => {
     e.preventDefault();
     const result = await login(email, password);
@@ -24,11 +37,13 @@ export const Login = () => {
     }
   };
 
+  /** Selects a workspace and navigates to the dashboard. */
   const handleSelectWorkspace = (tenantId) => {
     switchTenant(tenantId);
     navigate('/dashboard');
   };
 
+  /** Multi-workspace selection screen. */
   if (pendingWorkspaces) {
     return (
       <div className="min-h-[85vh] flex items-center justify-center px-4">
@@ -77,6 +92,7 @@ export const Login = () => {
     );
   }
 
+  /** Primary login form. */
   return (
     <div className="min-h-[85vh] flex items-center justify-center px-4">
       <div className="w-full max-w-md">

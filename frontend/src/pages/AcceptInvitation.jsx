@@ -1,3 +1,15 @@
+/**
+ * @fileoverview Invitation acceptance page.
+ *
+ * Handles workspace invitation acceptance via a URL token parameter.
+ * Three flows:
+ *   1. **Auto-accept** — If already logged in, accepts the invite automatically
+ *   2. **Login + accept** — Existing users sign in, then the invite is accepted
+ *   3. **Register + accept** — New users create an account, then join the workspace
+ *
+ * @module pages/AcceptInvitation
+ */
+
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -19,18 +31,21 @@ export const AcceptInvitation = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
+  /** Validates token presence on mount. */
   useEffect(() => {
     if (!token) {
       setError('Invalid invitation link. No token provided.');
     }
   }, [token]);
 
+  /** Auto-accepts invite if user is already authenticated. */
   useEffect(() => {
     if (isAuthenticated && token && !success && !loading) {
       handleAcceptInvite();
     }
   }, [isAuthenticated, token]);
 
+  /** Accepts invitation using the current session (auto-accept flow). */
   const handleAcceptInvite = async () => {
     setLoading(true);
     setError(null);
@@ -67,6 +82,7 @@ export const AcceptInvitation = () => {
     }
   };
 
+  /** Logs in existing user, then auto-accepts the invitation. */
   const handleLoginAndAccept = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -85,6 +101,7 @@ export const AcceptInvitation = () => {
     }
   };
 
+  /** Registers a new account and accepts the invitation in one step. */
   const handleRegisterAndAccept = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -126,6 +143,7 @@ export const AcceptInvitation = () => {
     }
   };
 
+  /** Invalid token state. */
   if (!token) {
     return (
       <div className="min-h-[85vh] flex items-center justify-center px-4">
@@ -149,6 +167,7 @@ export const AcceptInvitation = () => {
     );
   }
 
+  /** Loading state during auto-accept. */
   if (loading && isAuthenticated) {
     return (
       <div className="min-h-[85vh] flex items-center justify-center px-4">
@@ -163,6 +182,7 @@ export const AcceptInvitation = () => {
     );
   }
 
+  /** Success state with redirect countdown. */
   if (success) {
     return (
       <div className="min-h-[85vh] flex items-center justify-center px-4">
@@ -178,6 +198,7 @@ export const AcceptInvitation = () => {
     );
   }
 
+  /** Login/register form for invitation acceptance. */
   return (
     <div className="min-h-[85vh] flex items-center justify-center px-4">
       <div className="w-full max-w-md">

@@ -1,3 +1,13 @@
+/**
+ * @fileoverview Slot creation/editing form page.
+ *
+ * Dual-purpose form for creating new availability slots or editing existing ones.
+ * Admins can assign slots to any provider; providers can only create for themselves.
+ * Uses datetime-local inputs converted to ISO 8601 for the API.
+ *
+ * @module pages/SlotForm
+ */
+
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -17,6 +27,7 @@ export const SlotForm = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
+  /** Fetches the provider list for admin staff dropdown (admin only). */
   useEffect(() => {
     const fetchProviders = async () => {
       if (!isAdmin) return;
@@ -30,6 +41,7 @@ export const SlotForm = () => {
     fetchProviders();
   }, [isAdmin]);
 
+  /** Fetches existing slot data when editing. */
   useEffect(() => {
     if (isEditing) {
       const fetchSlot = async () => {
@@ -51,8 +63,10 @@ export const SlotForm = () => {
     }
   }, [id, isEditing]);
 
+  /** Generic form field change handler. */
   const handleChange = (e) => setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
 
+  /** Submits the form — creates or updates the slot via API. */
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);

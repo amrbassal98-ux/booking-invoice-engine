@@ -1,3 +1,16 @@
+/**
+ * @fileoverview Admin dashboard page.
+ *
+ * Three-tab dashboard for authenticated workspace members:
+ *   - **Slots** — View, create, edit, and delete availability slots
+ *   - **Bookings** — Monitor bookings with status management actions
+ *   - **Team** — Invite new providers/staff/customers (admin only)
+ *
+ * Fetches slots and bookings in parallel on mount.
+ *
+ * @module pages/AdminDashboard
+ */
+
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../api/axios.js';
@@ -15,6 +28,7 @@ export const AdminDashboard = () => {
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('slots');
 
+  /** Fetches slots and bookings in parallel. */
   const fetchData = async () => {
     setLoading(true);
     setError(null);
@@ -34,6 +48,7 @@ export const AdminDashboard = () => {
 
   useEffect(() => { fetchData(); }, []);
 
+  /** Deletes a slot after confirmation and updates local state. */
   const handleDelete = async (slot) => {
     if (!confirm('Delete this availability slot?')) return;
     try {
@@ -44,6 +59,7 @@ export const AdminDashboard = () => {
     }
   };
 
+  /** Updates a booking's status and patches local state optimistically. */
   const handleStatusUpdate = async (bookingId, status) => {
     try {
       await api.patch(`/api/bookings/${bookingId}/status`, { status });
@@ -53,6 +69,7 @@ export const AdminDashboard = () => {
     }
   };
 
+  /** Tailwind color mappings for booking status badges. */
   const statusColors = {
     pending: 'bg-amber-50 text-amber-700 border-amber-100',
     confirmed: 'bg-emerald-50 text-emerald-700 border-emerald-100',

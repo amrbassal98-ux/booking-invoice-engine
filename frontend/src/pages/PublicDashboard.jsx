@@ -1,3 +1,13 @@
+/**
+ * @fileoverview Public dashboard page.
+ *
+ * Displays available (unbooked) time slots for anonymous visitors.
+ * Redirects authenticated users to the admin dashboard.
+ * Fetches data from the public /api/public/availabilities endpoint.
+ *
+ * @module pages/PublicDashboard
+ */
+
 import { useState, useEffect } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import api from '../api/axios.js';
@@ -12,10 +22,12 @@ export const PublicDashboard = () => {
   const [error, setError] = useState(null);
   const navigate = useNavigate();
 
+  /** Redirect authenticated users to their dashboard. */
   if (isAuthenticated) {
     return <Navigate to="/dashboard" replace />;
   }
 
+  /** Fetches available slots from the public API. */
   const fetchSlots = async () => {
     setLoading(true);
     setError(null);
@@ -31,6 +43,7 @@ export const PublicDashboard = () => {
 
   useEffect(() => { fetchSlots(); }, []);
 
+  /** Navigates to the booking form for the selected slot. */
   const handleBook = (slot) => navigate(`/book/${slot.id}`);
 
   return (

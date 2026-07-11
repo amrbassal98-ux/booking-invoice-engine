@@ -1,3 +1,12 @@
+/**
+ * @fileoverview Tenant registration page.
+ *
+ * Creates a new workspace (tenant) with an admin user account.
+ * Auto-generates a URL-friendly slug from the organization name.
+ *
+ * @module pages/Register
+ */
+
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -12,6 +21,7 @@ export const Register = () => {
 
   useEffect(() => { clearError(); }, [clearError]);
 
+  /** Updates form state and auto-generates slug from tenant name. */
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm((prev) => ({
@@ -21,6 +31,7 @@ export const Register = () => {
     }));
   };
 
+  /** Submits registration and navigates to dashboard on success. */
   const handleSubmit = async (e) => {
     e.preventDefault();
     const result = await register(form);

@@ -1,3 +1,19 @@
+/**
+ * @fileoverview Booking form page with Stripe payment integration.
+ *
+ * Multi-step booking flow:
+ *   1. Fetch and display slot details
+ *   2. User enters booking amount
+ *   3. Initialize Stripe PaymentIntent via /api/bookings/checkout
+ *   4. Render Stripe <PaymentElement> for card input
+ *   5. Confirm payment and display success state
+ *
+ * Handles network errors, server errors, and validation errors with
+ * appropriate UI states. Wrapped in <StripeProvider> for Stripe context.
+ *
+ * @module pages/BookingForm
+ */
+
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
@@ -5,6 +21,10 @@ import api from '../api/axios.js';
 import { StripeProvider } from '../components/StripeProvider.jsx';
 import { Calendar, Clock, DollarSign, CheckCircle, ArrowLeft, CreditCard, Loader2, WifiOff, RefreshCw } from 'lucide-react';
 
+/**
+ * Inner booking form component that uses Stripe hooks.
+ * Separated to access useStripe/useElements within the StripeProvider context.
+ */
 const BookingFormInner = ({ onClientSecretChange }) => {
   const { slotId } = useParams();
   const navigate = useNavigate();
@@ -20,6 +40,7 @@ const BookingFormInner = ({ onClientSecretChange }) => {
   const [success, setSuccess] = useState(false);
   const [totalAmount, setTotalAmount] = useState('');
 
+  /** Fetches slot details with categorized error handling. */
   const fetchSlot = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -40,10 +61,9 @@ const BookingFormInner = ({ onClientSecretChange }) => {
     }
   }, [slotId]);
 
-  useEffect(() => {
-    fetchSlot();
-  }, [fetchSlot]);
+  useEffect(() => { fetchSlot(); }, [fetchSlot]);
 
+  /** Initializes a Stripe PaymentIntent and transitions to payment input. */
   const handleInitPayment = async () => {
     const amount = parseFloat(totalAmount);
     if (!amount || amount <= 0) {
@@ -76,12 +96,11 @@ const BookingFormInner = ({ onClientSecretChange }) => {
     }
   };
 
+  /** Confirms the Stripe payment and handles result. */
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!stripe || !elements) {
-      return;
-    }
+    if (!stripe || !elements) return;
 
     setSubmitting(true);
     setError(null);
@@ -107,6 +126,7 @@ const BookingFormInner = ({ onClientSecretChange }) => {
   const formatDate = (d) => new Date(d).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   const formatTime = (d) => new Date(d).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
+  /** Loading skeleton state. */
   if (loading) {
     return (
       <div className="w-full max-w-lg mx-auto">
@@ -138,6 +158,7 @@ const BookingFormInner = ({ onClientSecretChange }) => {
     );
   }
 
+  /** Error state with retry option for network/server errors. */
   if (error && !slot) {
     const isNetworkError = error.type === 'network' || error.type === 'server';
     return (
@@ -172,6 +193,7 @@ const BookingFormInner = ({ onClientSecretChange }) => {
     );
   }
 
+  /** Booked slot state — slot no longer available. */
   if (slot && slot.is_booked) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
@@ -183,6 +205,7 @@ const BookingFormInner = ({ onClientSecretChange }) => {
     );
   }
 
+  /** Payment success state. */
   if (success) {
     return (
       <div className="w-full max-w-md mx-auto text-center py-16">
@@ -225,6 +248,7 @@ const BookingFormInner = ({ onClientSecretChange }) => {
     );
   }
 
+  /** Primary booking form with amount input and Stripe payment element. */
   return (
     <div className="w-full max-w-lg mx-auto">
       <button onClick={() => navigate(-1)} className="inline-flex flex-row items-center gap-2 text-slate-400 hover:text-slate-600 text-sm font-medium mb-6 transition-colors">
@@ -311,11 +335,7 @@ const BookingFormInner = ({ onClientSecretChange }) => {
                 Payment Details
               </label>
               <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
-                <PaymentElement
-                  options={{
-                    layout: 'tabs',
-                  }}
-                />
+                <PaymentElement options={{ layout: 'tabs' }} />
               </div>
             </div>
 
@@ -347,6 +367,10 @@ const BookingFormInner = ({ onClientSecretChange }) => {
   );
 };
 
+/**
+ * Wrapper component that provides Stripe context to the booking form.
+ * Manages the clientSecret state that bridges the checkout API and Stripe Elements.
+ */
 export const BookingForm = () => {
   const [clientSecret, setClientSecret] = useState(null);
 
