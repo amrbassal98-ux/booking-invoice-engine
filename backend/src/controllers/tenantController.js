@@ -1,7 +1,41 @@
+/**
+ * @fileoverview Tenant onboarding controller.
+ *
+ * Handles two registration flows:
+ *   1. **Direct registration** — creates a new tenant, user, and tenant_admin membership.
+ *   2. **Invitation-based registration** — accepts an invitation token, creates the
+ *      user account (if new), and adds them to the existing tenant workspace.
+ *
+ * Both flows run inside a single database transaction to guarantee atomicity.
+ *
+ * @module controllers/tenantController
+ */
+
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import pool from '../config/db.js';
 
+/**
+ * POST /api/tenants/onboard
+ *
+ * Onboards a new tenant admin or accepts an invitation token.
+ *
+ * When `inviteToken` is absent, creates a brand-new tenant + admin user.
+ * When `inviteToken` is present, validates the invitation, creates the user
+ * account if they don't exist, adds them to the workspace, and issues a JWT.
+ *
+ * @param   {import('express').Request}  req
+ * @param   {import('express').Response} res
+ * @returns {Promise<void>}
+ *
+ * @response {object} 201 - Registration success with token + user + workspaces
+ * @response {object} 400 - Missing required fields
+ * @response {object} 403 - Invitation email mismatch
+ * @response {object} 404 - Invalid invitation token
+ * @response {object} 409 - Invitation already accepted / duplicate slug or email
+ * @response {object} 410 - Invitation expired
+ * @response {object} 500 - Internal server error
+ */
 export const registerTenantAdmin = async (req, res) => {
   const { tenantName, tenantSlug, email, password, firstName, lastName, inviteToken } = req.body;
 
@@ -26,6 +60,7 @@ export const registerTenantAdmin = async (req, res) => {
     let workspace;
 
     if (inviteToken) {
+      /** Invitation flow — validate token, create user, join workspace. */
       const inviteResult = await client.query(
         `SELECT id, tenant_id, email, role, expires_at, accepted_at
          FROM tenant_invitations
@@ -69,6 +104,7 @@ export const registerTenantAdmin = async (req, res) => {
         [invitation.tenant_id, newUser.id, invitation.role]
       );
 
+      /** Consume the invitation — mark as accepted and delete. */
       await client.query(
         'DELETE FROM tenant_invitations WHERE id = $1',
         [invitation.id]
@@ -110,6 +146,7 @@ export const registerTenantAdmin = async (req, res) => {
       });
 
     } else {
+      /** Direct registration flow — create tenant + admin user. */
       const tenantResult = await client.query(
         'INSERT INTO tenants (name, slug) VALUES ($1, $2) RETURNING id, name, slug, created_at',
         [tenantName, tenantSlug]
@@ -161,6 +198,7 @@ export const registerTenantAdmin = async (req, res) => {
     await client.query('ROLLBACK');
     console.error("Onboarding transaction aborted:", error.message);
 
+    /** Handle unique constraint violations on tenant slug or user email. */
     if (error.code === '23505') {
       return res.status(409).json({ error: "Conflict: Tenant slug or user email already exists." });
     }

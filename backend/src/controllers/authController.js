@@ -1,7 +1,32 @@
+/**
+ * @fileoverview Authentication controller — handles user login and JWT issuance.
+ *
+ * Validates credentials against the `users` table, resolves the caller's
+ * tenant memberships, and returns a signed JWT plus workspace metadata.
+ *
+ * @module controllers/authController
+ */
+
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import pool from '../config/db.js';
 
+/**
+ * POST /api/auth/login
+ *
+ * Authenticates a user by email/password, resolves their tenant workspaces,
+ * and returns a JWT scoped to the primary workspace.
+ *
+ * @param   {import('express').Request}  req
+ * @param   {import('express').Response} res
+ * @returns {Promise<void>}
+ *
+ * @response {object} 200 - { message, token, user, workspaces }
+ * @response {object} 400 - Missing email or password
+ * @response {object} 401 - Invalid credentials
+ * @response {object} 403 - No tenant workspace assigned
+ * @response {object} 500 - Internal server error
+ */
 export const loginUser = async (req, res) => {
   const { email, password } = req.body;
 
@@ -18,6 +43,7 @@ export const loginUser = async (req, res) => {
   try {
     client = await pool.connect();
 
+    /** Look up user by email — constant-time comparison is handled by bcrypt. */
     const userResult = await client.query(
       'SELECT id, email, password_hash, first_name, last_name FROM users WHERE email = $1',
       [email]
@@ -29,11 +55,13 @@ export const loginUser = async (req, res) => {
 
     const user = userResult.rows[0];
 
+    /** Verify password against bcrypt hash. */
     const passwordValid = await bcrypt.compare(password, user.password_hash);
     if (!passwordValid) {
       return res.status(401).json({ error: "Invalid email or password." });
     }
 
+    /** Fetch all tenant memberships for this user. */
     const tenantResult = await client.query(
       `SELECT tu.tenant_id, t.slug, t.name, tu.role
        FROM tenant_users tu
@@ -49,8 +77,10 @@ export const loginUser = async (req, res) => {
       return res.status(403).json({ error: "Access denied. No tenant workspace assigned." });
     }
 
+    /** Primary workspace — first alphabetically by tenant name. */
     const primary = workspaces[0];
 
+    /** Sign JWT with 24-hour expiry, scoped to the primary workspace. */
     const tokenPayload = {
       user_id: user.id,
       tenant_id: primary.tenant_id,
