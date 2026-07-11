@@ -1,3 +1,24 @@
+/**
+ * @fileoverview Root application component.
+ *
+ * Defines the client-side routing table using React Router v7. All routes
+ * are nested inside a shared <Layout /> wrapper that provides the navigation
+ * bar and <Outlet /> for page content.
+ *
+ * Route architecture:
+ *   /                        — Public slot browsing (unauthenticated)
+ *   /login                   — User login form
+ *   /register                — Tenant + admin registration
+ *   /unauthorized            — 403 access denied page
+ *   /accept-invite           — Invitation acceptance (token-based)
+ *   /dashboard               — Admin dashboard (protected)
+ *   /book/:slotId            — Slot booking + Stripe checkout (protected)
+ *   /admin/slots/new         — Create availability slot (admin/provider/staff)
+ *   /admin/slots/:id/edit    — Edit availability slot (admin/provider/staff)
+ *
+ * @module App
+ */
+
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext.jsx';
 import { Layout } from './components/Layout.jsx';
