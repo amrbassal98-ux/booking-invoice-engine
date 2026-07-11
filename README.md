@@ -213,6 +213,53 @@ services:
 
 ---
 
+## Security Scanning
+
+This project uses [Snyk](https://snyk.io/) for automated security scanning across both open-source dependencies and application code.
+
+### Dependency Scanning (`snyk test`)
+
+Scans third-party packages in `package-lock.json` for known vulnerabilities (CVEs).
+
+```bash
+# Scan backend dependencies
+cd backend && snyk test
+
+# Scan frontend dependencies
+cd frontend && snyk test
+```
+
+**Remediation:** Transitive dependency vulnerabilities are resolved via npm `overrides` in `package.json` to pin safe versions without waiting for upstream maintainers.
+
+### Static Application Security Testing (`snyk code test`)
+
+Performs SAST analysis on application source code to detect security anti-patterns such as:
+
+- Information disclosure (e.g., `X-Powered-By` header exposure)
+- Unvalidated input from HTTP request bodies
+- Insecure cryptographic usage
+- SQL injection, XSS, and path traversal patterns
+
+```bash
+# Run SAST scan
+snyk code test
+
+# Generate JSON report for CI integration
+snyk code test --json > snyk_sast_report.json
+```
+
+### Vulnerabilities Remediated
+
+| Vulnerability | Severity | File | Remediation |
+|--------------|----------|------|-------------|
+| Prototype Pollution in `@apidevtools/json-schema-ref-parser` | Medium | `package.json` | npm override to `^15.3.6` |
+| X-Powered-By header information disclosure | Low | `src/app.js` | `app.disable('x-powered-by')` |
+| Unchecked type from request body (`currency`) | Low | `bookingController.js` | Added `typeof` validation |
+| Unchecked type from request body (`email`) | Low | `tenantController.js` | Added `typeof` validation |
+| Unsafe `.toString()` on request body | Medium | `stripeWebhookController.js` | Replaced with `TextDecoder` + type guards |
+
+---
+
 ## Kubernetes Staging Deployment
 
 ### Prerequisites
