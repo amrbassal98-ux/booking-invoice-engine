@@ -56,6 +56,7 @@ BookingInvoiceEngine enables service providers (doctors, consultants, freelancer
 | Payments | Stripe SDK (`stripe`, `@stripe/react-stripe-js`) | Latest |
 | Database | PostgreSQL | 16-alpine |
 | Containerization | Docker (multi-stage builds) | Latest |
+| API Docs | Swagger UI, swagger-jsdoc, swagger-ui-express | Latest |
 | Orchestration | Kubernetes (Deployments, Services, ConfigMaps, Secrets, PVC, NetworkPolicy, PDB) | 1.28+ |
 | CI/CD | GitHub Actions | Latest |
 
@@ -357,6 +358,64 @@ minikube service frontend-svc --url
 
 ---
 
+## Interactive API Documentation (Swagger UI)
+
+The backend serves an interactive OpenAPI 3.0.0 specification via Swagger UI at the `/api-docs` endpoint. This provides a browsable, testable documentation interface for all 19 API endpoints.
+
+### Accessing Swagger UI
+
+| Environment | URL |
+|-------------|-----|
+| Local development | `http://localhost:5000/api-docs` |
+| Kubernetes (via port-forward) | `kubectl port-forward svc/backend-svc 5000:5000` → `http://localhost:5000/api-docs` |
+| Raw OpenAPI JSON | `http://localhost:5000/api-docs.json` |
+
+### Configuration File
+
+**File:** `backend/src/config/swagger.js`
+
+The OpenAPI specification is generated from JSDoc annotations in route and controller files using `swagger-jsdoc`. The configuration defines:
+
+- **Metadata** — API title, version, description, contact, and license
+- **Server** — Base URL (`/api`)
+- **Security** — BearerAuth (JWT) scheme applied globally
+- **Schemas** — 8 reusable component schemas (`Error`, `User`, `Workspace`, `AvailabilitySlot`, `Booking`, `Invoice`, `Invitation`, `HealthCheck`)
+- **Scan paths** — JSDoc blocks in `routes/*.js`, `controllers/*.js`, and `app.js` are aggregated into the spec
+
+### Documented Endpoints
+
+All 19 endpoints across 7 tag groups are fully documented:
+
+| Tag | Endpoints | Description |
+|-----|-----------|-------------|
+| **Auth** | `POST /auth/login` | JWT authentication |
+| **Tenants** | `POST /tenants/onboard` | Tenant registration / invitation flow |
+| **Users** | `GET /users/providers` | List providers/staff (admin only) |
+| **Availabilities** | 5 CRUD endpoints | Slot management with overlap detection |
+| **Bookings** | 5 endpoints | Booking lifecycle + Stripe checkout |
+| **Invitations** | 2 endpoints | Token-based workspace invitations |
+| **Webhooks** | `POST /webhooks/stripe` | Stripe event receiver |
+| **Public** | 2 endpoints | Unauthenticated slot browsing |
+| **Health** | `GET /health` | Kubernetes probe endpoint |
+
+### Dependencies
+
+```json
+{
+  "swagger-jsdoc": "^6.2.8",
+  "swagger-ui-express": "^5.0.1"
+}
+```
+
+### How It Works
+
+1. JSDoc `@openapi` blocks are placed directly above route definitions in `backend/src/routes/*.js`
+2. `swagger-jsdoc` scans the configured paths and aggregates all `@openapi` blocks into a single OpenAPI 3.0.0 JSON spec
+3. `swagger-ui-express` serves the interactive Swagger UI at `/api-docs`
+4. The raw JSON spec is also available at `/api-docs.json` for code generation tools
+
+---
+
 ## Project Structure
 
 ```
@@ -372,7 +431,8 @@ booking-invoice-engine/
 │   └── src/
 │       ├── app.js                      # Express app bootstrap + CORS + routes
 │       ├── config/
-│       │   └── db.js                   # PostgreSQL connection pool
+│       │   ├── db.js                   # PostgreSQL connection pool
+│       │   └── swagger.js             # OpenAPI 3.0.0 spec configuration
 │       ├── controllers/
 │       │   ├── authController.js       # Login + JWT issuance
 │       │   ├── availabilityController.js # Slot CRUD with overlap detection

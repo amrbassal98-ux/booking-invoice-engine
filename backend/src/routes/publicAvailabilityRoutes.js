@@ -13,15 +13,55 @@ import pool from '../config/db.js';
 const router = Router();
 
 /**
- * GET /api/public/availabilities
- *
- * Lists unbooked availability slots with optional time-range filters.
- * No authentication required — this is a public endpoint.
- *
- * @query   {string} [from]  - Start time lower bound (ISO 8601)
- * @query   {string} [to]    - End time upper bound (ISO 8601)
- * @query   {string} [limit] - Maximum number of results
- * @returns {object} 200 - { count, availabilities }
+ * @openapi
+ * /public/availabilities:
+ *   get:
+ *     tags: [Public]
+ *     summary: List unbooked availability slots
+ *     description: |
+ *       Public endpoint — no authentication required. Returns unbooked
+ *       availability slots with optional time-range filters. Used by the
+ *       public-facing booking dashboard for anonymous browsing.
+ *     parameters:
+ *       - in: query
+ *         name: from
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *         description: Start time lower bound (ISO 8601)
+ *       - in: query
+ *         name: to
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *         description: End time upper bound (ISO 8601)
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *         description: Maximum number of results to return
+ *     responses:
+ *       200:
+ *         description: List of unbooked availability slots
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 count:
+ *                   type: integer
+ *                   description: Number of slots returned
+ *                 availabilities:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/AvailabilitySlot'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 router.get('/', async (req, res) => {
   const { from, to, limit } = req.query;
@@ -72,13 +112,44 @@ router.get('/', async (req, res) => {
 });
 
 /**
- * GET /api/public/availabilities/:id
- *
- * Retrieves a single unbooked availability slot by ID.
- * No authentication required.
- *
- * @param   {string} id - Slot UUID from URL params
- * @returns {object} 200 - { availability } or 404
+ * @openapi
+ * /public/availabilities/{id}:
+ *   get:
+ *     tags: [Public]
+ *     summary: Get unbooked availability slot by ID
+ *     description: |
+ *       Public endpoint — no authentication required. Retrieves a single
+ *       unbooked availability slot by its UUID.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Slot UUID
+ *     responses:
+ *       200:
+ *         description: Slot details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 availability:
+ *                   $ref: '#/components/schemas/AvailabilitySlot'
+ *       404:
+ *         description: Slot not found or already booked
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 router.get('/:id', async (req, res) => {
   const { id } = req.params;
