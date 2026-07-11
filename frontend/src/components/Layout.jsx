@@ -1,18 +1,39 @@
+/**
+ * @fileoverview Application layout wrapper component.
+ *
+ * Provides the sticky navigation bar with:
+ *   - Brand logo and link to home
+ *   - Dashboard link (authenticated users)
+ *   - Multi-workspace switcher dropdown (users with multiple memberships)
+ *   - User avatar with name and role display
+ *   - Login/Register buttons (unauthenticated) or Logout button
+ *
+ * Uses <Outlet /> from React Router to render nested page content.
+ *
+ * @module components/Layout
+ */
+
 import { useState } from 'react';
 import { Outlet, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { LogOut, Calendar, LayoutDashboard, ChevronDown, Building2 } from 'lucide-react';
 
+/**
+ * Root layout component — renders the top navigation bar and page content area.
+ * @returns {JSX.Element}
+ */
 export const Layout = () => {
   const { user, isAuthenticated, memberships, activeTenant, switchTenant, logout } = useAuth();
   const navigate = useNavigate();
   const [showTenantMenu, setShowTenantMenu] = useState(false);
 
+  /** Handles user logout and redirects to login page. */
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
+  /** Switches active workspace and navigates to dashboard. */
   const handleSwitchTenant = (tenantId) => {
     switchTenant(tenantId);
     setShowTenantMenu(false);

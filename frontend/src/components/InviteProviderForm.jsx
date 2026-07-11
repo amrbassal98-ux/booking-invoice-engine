@@ -1,7 +1,23 @@
+/**
+ * @fileoverview Provider invitation form component.
+ *
+ * Allows tenant admins to send invitations to providers, staff, or customers.
+ * Displays the generated invitation token after successful creation for
+ * secure sharing outside the application.
+ *
+ * @module components/InviteProviderForm
+ */
+
 import { useState } from 'react';
 import api from '../api/axios.js';
 import { Mail, UserPlus, ChevronDown, CheckCircle, AlertCircle } from 'lucide-react';
 
+/**
+ * Invitation form component for adding new workspace members.
+ *
+ * @param {object}   props
+ * @param {Function} [props.onInvitationSent] - Callback fired after successful invite creation
+ */
 export const InviteProviderForm = ({ onInvitationSent }) => {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('provider');
@@ -9,12 +25,14 @@ export const InviteProviderForm = ({ onInvitationSent }) => {
   const [success, setSuccess] = useState(null);
   const [error, setError] = useState(null);
 
+  /** Available roles for invitation. */
   const roles = [
     { value: 'provider', label: 'Provider' },
     { value: 'staff', label: 'Staff' },
     { value: 'customer', label: 'Customer' },
   ];
 
+  /** Submits the invitation request to the API. */
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);

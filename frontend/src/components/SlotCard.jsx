@@ -1,18 +1,41 @@
+/**
+ * @fileoverview Slot card display component.
+ *
+ * Renders an availability slot as a card with date/time info, booking status
+ * badge, and contextual action buttons (Book Now, Edit, Delete) based on
+ * the user's role and the slot's booking state.
+ *
+ * @module components/SlotCard
+ */
+
 import { Calendar, Clock, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useNavigate } from 'react-router-dom';
 
+/**
+ * Availability slot card component.
+ *
+ * @param {object}   props
+ * @param {object}   props.slot        - Slot data { id, staff_id, start_time, end_time, is_booked }
+ * @param {Function} [props.onBook]    - Callback when "Book Now" is clicked
+ * @param {boolean}  [props.showActions] - Show admin Edit/Delete buttons
+ * @param {Function} [props.onEdit]    - Callback when "Edit" is clicked
+ * @param {Function} [props.onDelete]  - Callback when "Delete" is clicked
+ */
 export const SlotCard = ({ slot, onBook, showActions = false, onEdit, onDelete }) => {
   const { isAuthenticated, activeTenant } = useAuth();
   const navigate = useNavigate();
   const isProvider = activeTenant?.role === 'provider';
 
+  /** Formats an ISO date string to a short readable date. */
   const formatDate = (dateStr) =>
     new Date(dateStr).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 
+  /** Formats an ISO date string to a short readable time. */
   const formatTime = (dateStr) =>
     new Date(dateStr).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
+  /** Redirects to login if not authenticated, otherwise triggers onBook. */
   const handleBook = () => {
     if (!isAuthenticated) { navigate('/login'); return; }
     onBook?.(slot);
