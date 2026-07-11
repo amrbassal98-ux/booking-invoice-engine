@@ -1,0 +1,14 @@
+node_modules
+npm-debug.log
+.env
+.env.*
+!.env.example
+dist
+build
+.cache
+.vscode
+.qodo
+.git
+__tests__
+*.test.js
+*.spec.js
