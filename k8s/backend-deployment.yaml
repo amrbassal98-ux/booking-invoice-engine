@@ -17,6 +17,11 @@ spec:
         app: booking-engine
         component: backend
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
       containers:
         - name: backend
           image: booking-engine-backend:latest
@@ -40,13 +45,21 @@ spec:
                 configMapKeyRef:
                   name: app-config
                   key: SKIP_WEBHOOK_SIGNATURE
+            - name: DATABASE_USER
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: DATABASE_USER
             - name: DATABASE_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: app-secrets
                   key: DATABASE_PASSWORD
             - name: DATABASE_URL
-              value: "postgresql://postgres:$(DATABASE_PASSWORD)@postgres-svc:5432/booking_engine"
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: DATABASE_URL
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
@@ -69,6 +82,12 @@ spec:
             limits:
               cpu: 250m
               memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
           readinessProbe:
             httpGet:
               path: /health
@@ -81,3 +100,9 @@ spec:
               port: 5000
             initialDelaySeconds: 15
             periodSeconds: 20
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            failureThreshold: 30
+            periodSeconds: 2
