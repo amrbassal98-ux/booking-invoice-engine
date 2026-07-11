@@ -1,8 +1,28 @@
+/**
+ * @fileoverview Public availability route definitions.
+ *
+ * Provides unauthenticated access to view available (unbooked) time slots.
+ * Used by the public-facing dashboard for anonymous browsing.
+ *
+ * @module routes/publicAvailabilityRoutes
+ */
+
 import { Router } from 'express';
 import pool from '../config/db.js';
 
 const router = Router();
 
+/**
+ * GET /api/public/availabilities
+ *
+ * Lists unbooked availability slots with optional time-range filters.
+ * No authentication required — this is a public endpoint.
+ *
+ * @query   {string} [from]  - Start time lower bound (ISO 8601)
+ * @query   {string} [to]    - End time upper bound (ISO 8601)
+ * @query   {string} [limit] - Maximum number of results
+ * @returns {object} 200 - { count, availabilities }
+ */
 router.get('/', async (req, res) => {
   const { from, to, limit } = req.query;
 
@@ -51,6 +71,15 @@ router.get('/', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/public/availabilities/:id
+ *
+ * Retrieves a single unbooked availability slot by ID.
+ * No authentication required.
+ *
+ * @param   {string} id - Slot UUID from URL params
+ * @returns {object} 200 - { availability } or 404
+ */
 router.get('/:id', async (req, res) => {
   const { id } = req.params;
 
