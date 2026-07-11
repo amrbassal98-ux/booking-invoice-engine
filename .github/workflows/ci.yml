@@ -50,6 +50,24 @@ jobs:
       - name: Bootstrap database schema
         run: psql "$DATABASE_URL" -f backend/src/__tests__/schema.sql
 
+      - name: Start backend server
+        working-directory: backend
+        run: node server.js &
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          JWT_SECRET: ${{ env.JWT_SECRET }}
+          STRIPE_SECRET_KEY: ${{ env.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ env.STRIPE_WEBHOOK_SECRET }}
+          SKIP_WEBHOOK_SIGNATURE: ${{ env.SKIP_WEBHOOK_SIGNATURE }}
+          PORT: "5000"
+
+      - name: Wait for server to be ready
+        run: |
+          for i in $(seq 1 15); do
+            curl -sf http://localhost:5000/health && break
+            sleep 1
+          done
+
       - name: Run integration tests
         working-directory: backend
         run: npm test
