@@ -22,7 +22,7 @@ export const InviteProviderForm = ({ onInvitationSent }) => {
     setSuccess(null);
 
     try {
-      const response = await api.post('/api/invitations', { email, role });
+      const response = await api.post('/invitations', { email, role });
       const invitation = response.data.invitation;
 
       setSuccess({

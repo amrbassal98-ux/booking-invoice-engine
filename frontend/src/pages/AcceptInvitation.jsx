@@ -36,7 +36,7 @@ export const AcceptInvitation = () => {
     setError(null);
 
     try {
-      const response = await api.post('/api/invitations/accept', { token });
+      const response = await api.post('/invitations/accept', { token });
       const { user, tenant_id } = response.data;
 
       const newMembership = {

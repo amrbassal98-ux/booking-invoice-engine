@@ -21,7 +21,7 @@ export const SlotForm = () => {
     const fetchProviders = async () => {
       if (!isAdmin) return;
       try {
-        const response = await api.get('/api/users/providers');
+        const response = await api.get('/users/providers');
         setProviders(response.data.providers);
       } catch (err) {
         console.error('Failed to load providers:', err);
@@ -34,7 +34,7 @@ export const SlotForm = () => {
     if (isEditing) {
       const fetchSlot = async () => {
         try {
-          const response = await api.get(`/api/availabilities/${id}`);
+          const response = await api.get(`/availabilities/${id}`);
           const slot = response.data.availability;
           setForm({
             staff_id: slot.staff_id,
@@ -68,9 +68,9 @@ export const SlotForm = () => {
       }
 
       if (isEditing) {
-        await api.put(`/api/availabilities/${id}`, payload);
+        await api.put(`/availabilities/${id}`, payload);
       } else {
-        await api.post('/api/availabilities', payload);
+        await api.post('/availabilities', payload);
       }
       navigate('/dashboard');
     } catch (err) {

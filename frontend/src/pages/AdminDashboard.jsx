@@ -20,8 +20,8 @@ export const AdminDashboard = () => {
     setError(null);
     try {
       const [slotsRes, bookingsRes] = await Promise.all([
-        api.get('/api/availabilities'),
-        api.get('/api/bookings'),
+        api.get('/availabilities'),
+        api.get('/bookings'),
       ]);
       setSlots(slotsRes.data.availabilities);
       setBookings(bookingsRes.data.bookings);
@@ -37,7 +37,7 @@ export const AdminDashboard = () => {
   const handleDelete = async (slot) => {
     if (!confirm('Delete this availability slot?')) return;
     try {
-      await api.delete(`/api/availabilities/${slot.id}`);
+      await api.delete(`/availabilities/${slot.id}`);
       setSlots((prev) => prev.filter((s) => s.id !== slot.id));
     } catch (err) {
       alert(err.response?.data?.error || 'Failed to delete slot.');

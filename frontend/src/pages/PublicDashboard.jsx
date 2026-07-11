@@ -20,7 +20,7 @@ export const PublicDashboard = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.get('/api/availabilities?is_booked=false');
+      const response = await api.get('/public/availabilities');
       setSlots(response.data.availabilities);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load available slots.');

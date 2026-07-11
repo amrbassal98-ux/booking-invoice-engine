@@ -70,7 +70,7 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.post('/api/auth/login', { email, password });
+      const response = await api.post('/auth/login', { email, password });
       const { token: newToken, user: userData, workspaces } = response.data;
 
       persistAuth(newToken, userData, workspaces);
@@ -89,7 +89,7 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.post('/api/tenants/onboard', data);
+      const response = await api.post('/tenants/onboard', data);
       const { token: newToken, user: userData, workspaces } = response.data;
 
       persistAuth(newToken, userData, workspaces);
@@ -108,7 +108,7 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.post('/api/invitations/accept', inviteData);
+      const response = await api.post('/invitations/accept', inviteData);
       const { token: newToken, user: userData, workspaces } = response.data;
 
       if (newToken && workspaces) {
@@ -124,6 +124,10 @@ export const AuthProvider = ({ children }) => {
       setLoading(false);
     }
   }, [persistAuth]);
+
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
 
   const logout = useCallback(() => {
     clearAuth();
@@ -145,6 +149,7 @@ export const AuthProvider = ({ children }) => {
     register,
     acceptInvite,
     logout,
+    clearError,
     hasRole,
     switchTenant,
   };

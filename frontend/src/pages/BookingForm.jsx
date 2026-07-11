@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import api from '../api/axios.js';
 import { StripeProvider } from '../components/StripeProvider.jsx';
-import { Calendar, Clock, DollarSign, CheckCircle, ArrowLeft, CreditCard, Loader2 } from 'lucide-react';
+import { Calendar, Clock, DollarSign, CheckCircle, ArrowLeft, CreditCard, Loader2, WifiOff, RefreshCw } from 'lucide-react';
 
 const BookingFormInner = ({ onClientSecretChange }) => {
   const { slotId } = useParams();
@@ -20,24 +20,34 @@ const BookingFormInner = ({ onClientSecretChange }) => {
   const [success, setSuccess] = useState(false);
   const [totalAmount, setTotalAmount] = useState('');
 
-  useEffect(() => {
-    const fetchSlot = async () => {
-      try {
-        const response = await api.get(`/api/availabilities/${slotId}`);
-        setSlot(response.data.availability);
-      } catch (err) {
-        setError(err.response?.data?.error || 'Failed to load slot details.');
-      } finally {
-        setLoading(false);
+  const fetchSlot = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await api.get(`/availabilities/${slotId}`);
+      setSlot(response.data.availability);
+    } catch (err) {
+      const status = err.response?.status;
+      if (!err.response) {
+        setError({ type: 'network', message: 'Unable to connect to the server. Please check your connection and try again.' });
+      } else if (status >= 500) {
+        setError({ type: 'server', message: 'Something went wrong on our end. Please try again in a moment.' });
+      } else {
+        setError({ type: 'client', message: err.response?.data?.error || 'Failed to load slot details.' });
       }
-    };
-    fetchSlot();
+    } finally {
+      setLoading(false);
+    }
   }, [slotId]);
+
+  useEffect(() => {
+    fetchSlot();
+  }, [fetchSlot]);
 
   const handleInitPayment = async () => {
     const amount = parseFloat(totalAmount);
     if (!amount || amount <= 0) {
-      setError('Please enter a valid booking amount.');
+      setError({ type: 'validation', message: 'Please enter a valid booking amount.' });
       return;
     }
 
@@ -45,7 +55,7 @@ const BookingFormInner = ({ onClientSecretChange }) => {
     setSubmitting(true);
 
     try {
-      const response = await api.post('/api/bookings/checkout', {
+      const response = await api.post('/bookings/checkout', {
         availability_id: slotId,
         total_amount: amount,
         currency: 'USD',
@@ -54,7 +64,13 @@ const BookingFormInner = ({ onClientSecretChange }) => {
       onClientSecretChange(response.data.clientSecret);
       setPaymentReady(true);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to initialize payment.');
+      if (!err.response) {
+        setError({ type: 'network', message: 'Unable to connect. Please check your connection and try again.' });
+      } else if (err.response.status >= 500) {
+        setError({ type: 'server', message: 'Something went wrong on our end. Please try again.' });
+      } else {
+        setError({ type: 'client', message: err.response?.data?.error || 'Failed to initialize payment.' });
+      }
     } finally {
       setSubmitting(false);
     }
@@ -79,7 +95,7 @@ const BookingFormInner = ({ onClientSecretChange }) => {
     });
 
     if (stripeError) {
-      setError(stripeError.message || 'Payment failed. Please try again.');
+      setError({ type: 'payment', message: stripeError.message || 'Payment failed. Please try again.' });
       setSubmitting(false);
       return;
     }
@@ -93,20 +109,65 @@ const BookingFormInner = ({ onClientSecretChange }) => {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-20">
-        <div className="w-10 h-10 border-3 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4" />
-        <p className="text-slate-400 text-sm font-medium">Loading slot details...</p>
+      <div className="w-full max-w-lg mx-auto">
+        <div className="h-4 w-16 bg-slate-200 rounded animate-[skeleton_1.8s_ease-in-out_infinite] mb-6" />
+        <div className="h-7 w-48 bg-slate-200 rounded-lg animate-[skeleton_1.8s_ease-in-out_infinite] mb-6" />
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-6 mb-4 shadow-sm">
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-row items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-slate-200 animate-[skeleton_1.8s_ease-in-out_infinite]" />
+              <div className="h-4 w-52 bg-slate-200 rounded animate-[skeleton_1.8s_ease-in-out_infinite]" />
+            </div>
+            <div className="flex flex-row items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-slate-200 animate-[skeleton_1.8s_ease-in-out_infinite]" />
+              <div className="h-4 w-36 bg-slate-200 rounded animate-[skeleton_1.8s_ease-in-out_infinite]" />
+            </div>
+          </div>
+        </div>
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm space-y-5">
+          <div className="flex flex-col gap-1.5">
+            <div className="h-4 w-32 bg-slate-200 rounded animate-[skeleton_1.8s_ease-in-out_infinite]" />
+            <div className="h-10 w-full bg-slate-200 rounded-xl animate-[skeleton_1.8s_ease-in-out_infinite]" />
+          </div>
+          <div className="flex flex-row gap-3 pt-2">
+            <div className="flex-1 h-11 bg-slate-200 rounded-xl animate-[skeleton_1.8s_ease-in-out_infinite]" />
+            <div className="flex-1 h-11 bg-slate-200 rounded-xl animate-[skeleton_1.8s_ease-in-out_infinite]" />
+          </div>
+        </div>
       </div>
     );
   }
 
   if (error && !slot) {
+    const isNetworkError = error.type === 'network' || error.type === 'server';
     return (
-      <div className="flex flex-col items-center justify-center py-20">
-        <p className="text-red-500 mb-4 font-medium">{error}</p>
-        <button onClick={() => navigate('/')} className="text-indigo-600 hover:text-indigo-700 font-semibold text-sm">
-          Back to slots
-        </button>
+      <div className="w-full max-w-md mx-auto flex flex-col items-center justify-center py-16">
+        <div className="w-20 h-20 rounded-full bg-slate-100 flex items-center justify-center mb-6 border-4 border-slate-200">
+          <WifiOff className="w-9 h-9 text-slate-400" />
+        </div>
+        <h2 className="text-xl font-bold text-slate-900 mb-2">
+          {isNetworkError ? 'Connection Problem' : 'Unable to Load Slot'}
+        </h2>
+        <p className="text-slate-500 text-sm text-center mb-8 max-w-xs leading-relaxed">
+          {error.message}
+        </p>
+        <div className="flex flex-col sm:flex-row gap-3 w-full max-w-xs">
+          {isNetworkError && (
+            <button
+              onClick={fetchSlot}
+              className="flex-1 inline-flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white py-3 px-5 rounded-xl text-sm font-semibold shadow-lg shadow-indigo-500/25 hover:shadow-xl transition-all duration-200"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Retry Connection
+            </button>
+          )}
+          <button
+            onClick={() => navigate('/')}
+            className="flex-1 inline-flex items-center justify-center bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300 py-3 px-5 rounded-xl text-sm font-semibold transition-all duration-200"
+          >
+            Back to Slots
+          </button>
+        </div>
       </div>
     );
   }
@@ -198,7 +259,7 @@ const BookingFormInner = ({ onClientSecretChange }) => {
             <div className="w-5 h-5 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
               <span className="text-red-500 text-xs font-bold">!</span>
             </div>
-            {error}
+            {error.message || error}
           </div>
         )}
 
