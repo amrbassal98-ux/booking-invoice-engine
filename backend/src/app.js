@@ -35,6 +35,9 @@ import publicAvailabilityRoutes from './routes/publicAvailabilityRoutes.js';
 
 const app = express();
 
+/** Disable X-Powered-By header to prevent information disclosure. */
+app.disable('x-powered-by');
+
 /** Parsed from CORS_ORIGINS env var (comma-separated), falls back to localhost dev origins. */
 const allowedOrigins = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(',').map(o => o.trim())

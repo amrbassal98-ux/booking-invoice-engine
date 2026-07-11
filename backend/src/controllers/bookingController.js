@@ -168,6 +168,10 @@ export const createCheckoutSession = async (req, res) => {
     return res.status(400).json({ error: "total_amount must be a positive number." });
   }
 
+  if (currency !== undefined && typeof currency !== 'string') {
+    return res.status(400).json({ error: "currency must be a string." });
+  }
+
   const client = await pool.connect();
 
   try {

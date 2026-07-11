@@ -53,8 +53,15 @@ export const handleStripeWebhook = async (req, res) => {
 
   if (SKIP_SIGNATURE) {
     /** Development mode — parse body directly without verification. */
-    const raw = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : req.body;
-    event = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    if (Buffer.isBuffer(req.body)) {
+      event = JSON.parse(new TextDecoder().decode(req.body));
+    } else if (typeof req.body === 'string') {
+      event = JSON.parse(req.body);
+    } else if (typeof req.body === 'object' && req.body !== null) {
+      event = req.body;
+    } else {
+      return res.status(400).json({ error: "Invalid request body type." });
+    }
   } else {
     /** Production mode — verify Stripe webhook signature. */
     const sig = req.headers['stripe-signature'];

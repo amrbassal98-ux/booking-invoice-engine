@@ -43,6 +43,10 @@ export const registerTenantAdmin = async (req, res) => {
     return res.status(400).json({ error: "Missing required fields: email, password." });
   }
 
+  if (typeof email !== 'string') {
+    return res.status(400).json({ error: "email must be a string." });
+  }
+
   if (!inviteToken && (!tenantName || !tenantSlug)) {
     return res.status(400).json({ error: "Missing required onboarding parameters: tenantName, tenantSlug (or provide inviteToken)." });
   }
