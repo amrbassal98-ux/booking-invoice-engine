@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { Building2, Mail, Lock, User, ArrowRight, Hash } from 'lucide-react';
@@ -7,8 +7,10 @@ export const Register = () => {
   const [form, setForm] = useState({
     tenantName: '', tenantSlug: '', email: '', password: '', firstName: '', lastName: '',
   });
-  const { register, loading, error } = useAuth();
+  const { register, loading, error, clearError } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => { clearError(); }, [clearError]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { LogIn, Mail, Lock, ArrowRight, Building2, ChevronRight } from 'lucide-react';
@@ -7,8 +7,10 @@ export const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [pendingWorkspaces, setPendingWorkspaces] = useState(null);
-  const { login, switchTenant, loading, error } = useAuth();
+  const { login, switchTenant, loading, error, clearError } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => { clearError(); }, [clearError]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
