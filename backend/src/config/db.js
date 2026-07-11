@@ -1,3 +1,12 @@
+/**
+ * @fileoverview PostgreSQL connection pool configuration.
+ * Initializes and exports a singleton `pg.Pool` instance using the DATABASE_URL
+ * environment variable. Pool settings are tuned for containerized workloads
+ * with a bounded connection ceiling and idle timeout to prevent resource leaks.
+ *
+ * @module config/db
+ */
+
 import pg from 'pg';
 
 const { Pool } = pg;
@@ -6,6 +15,10 @@ if (!process.env.DATABASE_URL) {
   throw new Error("CRITICAL: DATABASE_URL variable is missing from the localized backend environment configuration.");
 }
 
+/**
+ * Singleton connection pool shared across all controllers.
+ * @type {import('pg').Pool}
+ */
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   max: 10,
